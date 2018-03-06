@@ -27,25 +27,38 @@
 	<script type="text/javascript" src="../jquery.ganttView.js"></script>
 	<script type="text/javascript" src="data.js"></script>
 	<script type="text/javascript">
+		var updatedData = [];
+
+		var freezeDate = new Date();
+		freezeDate.setYear(2010);
+		freezeDate.setMonth(0);
+		freezeDate.setDate(2);
 		$(function () {
 			$("#ganttChart").ganttView({ 
 				data: ganttData,
 				slideWidth: 900,
 				groupBySeries: true,
-				groupById: true,
-				groupByIdDrawAllTitles: true,
+				dateChunks: 24,
+				updateDependencies: true,
+				freezeDate,
 				behavior: {
 					onClick: function (data) { 
-						var msg = "You clicked on an event: { start: " + data.start.toString("M/d/yyyy") + ", end: " + data.end.toString("M/d/yyyy") + " }";
+						var msg = "You clicked on an event: { start: " + data.start.toString("M/d/yyyy H:mm") + ", end: " + data.end.toString("M/d/yyyy H:mm") + " }";
 						$("#eventMessage").text(msg);
 					},
-					onResize: function (data) { 
-						var msg = "You resized an event: { start: " + data.start.toString("M/d/yyyy") + ", end: " + data.end.toString("M/d/yyyy") + " }";
+					onResize: function (uData) { 
+						var msg = "You resized an event: { start: " + uData[uData.length-1].start.toString("M/d/yyyy H:mm") + ", end: " + uData[uData.length-1].end.toString("M/d/yyyy H:mm") + " }";
 						$("#eventMessage").text(msg);
+						//call function updateIfChanged
+						updatedData = uData;
+						console.log(updatedData);
 					},
-					onDrag: function (data) { 
-						var msg = "You dragged an event: { start: " + data.start.toString("M/d/yyyy") + ", end: " + data.end.toString("M/d/yyyy") + " }";
+					onDrag: function (uData) { 
+						var msg = "You dragged an event: { start: " + uData[uData.length-1].start.toString("M/d/yyyy H:mm") + ", end: " + uData[uData.length-1].end.toString("M/d/yyyy H:mm") + " }";
 						$("#eventMessage").text(msg);
+						//call function updateIfChanged
+						updatedData = uData;
+						console.log(updatedData);
 					}
 				}
 			});
@@ -53,6 +66,5 @@
 			// $("#ganttChart").ganttView("setSlideWidth", 600);
 		});
 	</script>
-
 </body>
 </html>
