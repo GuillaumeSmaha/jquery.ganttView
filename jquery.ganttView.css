@@ -6,6 +6,7 @@ MIT License Applies
 
 div.ganttview-hzheader-month,
 div.ganttview-hzheader-day,
+div.ganttview-hzheader-chunk,
 div.ganttview-vtheader,
 div.ganttview-vtheader-item-name,
 div.ganttview-vtheader-series,
@@ -15,12 +16,14 @@ div.ganttview-grid-row-cell {
 }
 
 div.ganttview-hzheader-month,
-div.ganttview-hzheader-day {
+div.ganttview-hzheader-day,
+div.ganttview-hzheader-chunk {
 	text-align: center;
 }
 
 div.ganttview-grid-row-cell.last,
 div.ganttview-hzheader-day.last,
+div.ganttview-hzheader-chunk.last,
 div.ganttview-hzheader-month.last {
 	border-right: none;
 }

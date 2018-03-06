@@ -32,19 +32,18 @@
 				data: ganttData,
 				slideWidth: 900,
 				groupBySeries: true,
-				groupById: true,
-				groupByIdDrawAllTitles: true,
+				dateChunks: 24,
 				behavior: {
 					onClick: function (data) { 
-						var msg = "You clicked on an event: { start: " + data.start.toString("M/d/yyyy") + ", end: " + data.end.toString("M/d/yyyy") + " }";
+						var msg = "You clicked on an event: { start: " + data.start.toString("M/d/yyyy hh:mm") + ", end: " + data.end.toString("M/d/yyyy hh:mm") + " }";
 						$("#eventMessage").text(msg);
 					},
 					onResize: function (data) { 
-						var msg = "You resized an event: { start: " + data.start.toString("M/d/yyyy") + ", end: " + data.end.toString("M/d/yyyy") + " }";
+						var msg = "You resized an event: { start: " + data.start.toString("M/d/yyyy hh:mm") + ", end: " + data.end.toString("M/d/yyyy hh:mm") + " }";
 						$("#eventMessage").text(msg);
 					},
 					onDrag: function (data) { 
-						var msg = "You dragged an event: { start: " + data.start.toString("M/d/yyyy") + ", end: " + data.end.toString("M/d/yyyy") + " }";
+						var msg = "You dragged an event: { start: " + data.start.toString("M/d/yyyy hh:mm") + ", end: " + data.end.toString("M/d/yyyy hh:mm") + " }";
 						$("#eventMessage").text(msg);
 					}
 				}
