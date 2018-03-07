@@ -62,8 +62,6 @@ behavior: {
         var opts = jQuery.extend(true, defaults, options);
 
         if (opts.data) {
-            console.log(opts.data);
-
             opts.data.forEach(function (feature) {
                 if (feature.series) {
                     let prevEnd;
@@ -323,9 +321,11 @@ behavior: {
             for (var y in dates) {
                 for (var m in dates[y]) {
                     for (var d in dates[y][m]) {
+                        let isWeekendBool = showWeekends && DateUtils.isWeekend(dates[y][m][d]);
+                        
                         for (var dateChunk = 0; dateChunk < dateChunks; ++dateChunk){
                             var cellDiv = jQuery("<div>", { "class": "ganttview-grid-row-cell" });
-                            if (DateUtils.isWeekend(dates[y][m][d]) && showWeekends) { 
+                            if (isWeekendBool) { 
                                 cellDiv.addClass("ganttview-weekend"); 
                             }
                             rowDiv.append(cellDiv);
@@ -446,7 +446,7 @@ behavior: {
                                 var offset = DateUtils.daysBetween(start, series.start)*dateChunks;
                                 var block = jQuery("<div>", {
                                   "class": "ganttview-block",
-                                  "title": series.name + ", " + size + " hrs",
+                                  "title": series.name + ", " + size/dateChunks + " hrs",
                                   "css": {
                                       "height": (parseInt(jQuery(rows[rowIdx]).css('height'), 10) - 4) + "px",
                                       "width": ((size * cellWidth) - 9) + "px",
@@ -458,7 +458,7 @@ behavior: {
                                 if (data[i].series[j].color) {
                                     block.css("background-color", data[i].series[j].color);
                                 }
-                                block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size));
+                                block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size/dateChunks));
                                 jQuery(rows[rowIdx]).append(block);
                             }
 
@@ -475,7 +475,7 @@ behavior: {
                                 var offset = DateUtils.daysBetween(start, series.start)*dateChunks;
                                 var block = jQuery("<div>", {
                                   "class": "ganttview-block",
-                                  "title": series.name + ", " + size + " days",
+                                  "title": series.name + ", " + size/dateChunks + " days",
                                   "css": {
                                       "height": (parseInt(jQuery(rows[ listId[ id ] ]).css('height'), 10) - 4) + "px",
                                       "width": ((size * cellWidth) - 9) + "px",
@@ -487,7 +487,7 @@ behavior: {
                                 if (data[i].series[j].color) {
                                     block.css("background-color", data[i].series[j].color);
                                 }
-                                block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size));
+                                block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size/dateChunks));
                                 jQuery(rows[ listId[ id ] ]).append(block);
                             }
                         }
@@ -501,7 +501,7 @@ behavior: {
                             var offset = DateUtils.daysBetween(start, series.start)*dateChunks;
                             var block = jQuery("<div>", {
                               "class": "ganttview-block",
-                              "title": series.name + ", " + size + " days",
+                              "title": series.name + ", " + size/dateChunks + " days",
                               "css": {
                                   "height": (parseInt(jQuery(rows[rowIdx]).css('height'), 10) - 4) + "px",
                                   "width": ((size * cellWidth) - 9) + "px",
@@ -513,7 +513,7 @@ behavior: {
                             if (data[i].series[j].color) {
                                 block.css("background-color", data[i].series[j].color);
                             }
-                            block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size));
+                            block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size/dateChunks));
                             jQuery(rows[rowIdx]).append(block);
                         }
                         rowIdx = rowIdx + 1;
@@ -593,10 +593,15 @@ behavior: {
         function bindBlockResize(div, dateChunks, cellWidth, startDate, callback) {
             jQuery("div.ganttview-block", div).resizable({
                 grid: cellWidth, 
-                handles: "e,w",
+                handles: "e",
                 stop: function () {
                     var block = jQuery(this);
-                    updateDataAndPosition(div, block, dateChunks, cellWidth, startDate);
+
+                    var container = jQuery("div.ganttview-slide-container", div);
+                    var scroll = container.scrollLeft();
+                    var offset = block.offset().left - container.offset().left - 1 + scroll;
+
+                    updateDataAndPosition(offset, block, dateChunks, cellWidth, startDate);
                     if (callback) { callback(block.data("block-data")); }
                 }
             });
@@ -608,16 +613,34 @@ behavior: {
                 grid: [cellWidth, cellWidth],
                 stop: function () {
                     var block = jQuery(this);
-                    updateDataAndPosition(div, block, dateChunks, cellWidth, startDate);
+
+                    console.log(this);
+
+                    var container = jQuery("div.ganttview-slide-container", div);
+                    var scroll = container.scrollLeft();
+                    var offset = block.offset().left - container.offset().left - 1 + scroll;
+
+                    updateDataAndPosition(offset, block, dateChunks, cellWidth, startDate);
                     if (callback) { callback(block.data("block-data")); }
                 }
             });
         }
         
-        function updateDataAndPosition(div, block, dateChunks, cellWidth, startDate) {
-            var container = jQuery("div.ganttview-slide-container", div);
-            var scroll = container.scrollLeft();
-            var offset = block.offset().left - container.offset().left - 1 + scroll;
+        function updateDataAndPosition(offset, block, dateChunks, cellWidth, startDate) {
+            var parent = block[0].parentElement;
+            var childElementCount = parent.childElementCount;
+            var index;
+
+            let i=0;
+
+            while (!index && i<childElementCount){
+                if(parent.childNodes[i] == block[0]){
+                    index = i;
+                }
+                ++i;
+            }
+
+            // console.log(block);
 
             // Set new start date
             var dayInMS = 86400000;
@@ -625,18 +648,109 @@ behavior: {
 
             var chunksFromStart = Math.round(offset / cellWidth);
             var newStart = new Date(startDate.getTime() + (chunksFromStart*chunkInMS));
-            block.data("block-data").start = newStart;
 
             // Set new end date
             var width = block.outerWidth();
-            var chunksFromStart = parseInt(width / cellWidth) + 1;
-            block.data("block-data").end = new Date(newStart.clone().getTime() + (chunksFromStart*chunkInMS));
-            jQuery("div.ganttview-block-text", block).text(chunksFromStart + 1);
+            var chunksFromStartToEnd = parseInt(width / cellWidth);
+            var newEnd = new Date(newStart.clone().getTime() + (chunksFromStartToEnd*chunkInMS));
+
+            //updateDataAndPosition for next element in series
+            //nextSibling, nextElementSibling, 
+            //offsetParent.childNodes, offsetParent.children, offsetParent.lastChild, offsetParent.lastElementChild
+            //parentElement.childNodes, parentElement.children, parentElement.lastChild, parentElement.lastElementChild
+            //parentNode.childNodes, parentNode.children, parentNode.lastChild, parentNode.lastElementChild
+
+            block.data("block-data").start = newStart;
+            block.data("block-data").end = newEnd;
+
+            jQuery("div.ganttview-block-text", block).text(chunksFromStartToEnd/dateChunks + 1);
+
             
+
+            //if previousSibling update?
+            //if nextSibling
+            if(index < childElementCount-1){
+                // var newBlock = block.clone();
+                // newBlock[0] = block.parent().children()[index+1];
+                // newBlock.context = block.parent().children()[index+1];
+
+                // var parents = ["offsetParent", "parentElement", "parentNode"];
+                // var children = ["childNodes", "children"];
+                // var lastChildren = ["lastChild", "lastElementChild"];
+
+                // var updatedChild = 
+                updateDataAndPosition(offset + width, jQuery(block.parent().children()[index+1]), dateChunks, cellWidth, newEnd);
+
+                // for (var p in parents) {
+                //     for (var c in children) {
+                //         parent[parents[p]][children[c]][index + 1] = updatedChild[0];
+                //         block.context[parents[p]][children[c]][index + 1] = updatedChild[0];
+                //     }
+
+                //     for (var lc in lastChildren){
+                //         parent[parents[p]][lastChildren[lc]] = updatedChild[0][parents[p]][lastChildren[lc]];
+                //         block.context[parents[p]][lastChildren[lc]] = updatedChild[0][parents[p]][lastChildren[lc]];
+                //     }
+                // }
+            }
+            while (index > 1){
+                --index;
+                // var newBlock = block.clone();
+                // newBlock[0] = block.parent().children()[index+1];
+                // newBlock.context = block.parent().children()[index+1];
+
+                // var parents = ["offsetParent", "parentElement", "parentNode"];
+                // var children = ["childNodes", "children"];
+                // var lastChildren = ["lastChild", "lastElementChild"];
+
+                // var updatedChild = 
+                //updateDataAndPosition(offset + width, jQuery(block.parent().children()[index]), dateChunks, cellWidth, newEnd);
+
+                // for (var p in parents) {
+                //     for (var c in children) {
+                //         parent[parents[p]][children[c]][index + 1] = updatedChild[0];
+                //         block.context[parents[p]][children[c]][index + 1] = updatedChild[0];
+                //     }
+
+                //     for (var lc in lastChildren){
+                //         parent[parents[p]][lastChildren[lc]] = updatedChild[0][parents[p]][lastChildren[lc]];
+                //         block.context[parents[p]][lastChildren[lc]] = updatedChild[0][parents[p]][lastChildren[lc]];
+                //     }
+                // }
+            }
+
+            var parentChildren = block.parent().children();
+
+            // for(i=0; i<parentChildren.length; ++i){
+            //     // Set new end date
+            //     console.log(parentChildren[i]);
+            //     var newBlock = block.clone();
+            //     newBlock[0] = parentChildren[i];
+            //     newBlock.context = parentChildren[i];
+
+            //     var width = newBlock.outerWidth();
+            //     var chunksFromStart = parseInt(width / cellWidth);
+            //     var newEnd = new Date(newStart.clone().getTime() + (chunksFromStart*chunkInMS));
+
+            //     parentChildren[i].data("block-data").start = newStart;
+            //     parentChildren[i].data("block-data").end = newEnd;
+
+            //     jQuery("div.ganttview-block-text", parentChildren[i]).text(chunksFromStart/dateChunks + 1);
+
+            //     // Remove top and left properties to avoid incorrect block positioning,
+            //     // set position to relative to keep blocks relative to scrollbar when scrolling
+            //     parentChildren[i].css("top", "0").css("left", "")
+            //     .css("position", "absolute").css("margin-left", offset + "px");
+
+            //     newStart = newEnd;
+            // }
+
             // Remove top and left properties to avoid incorrect block positioning,
             // set position to relative to keep blocks relative to scrollbar when scrolling
-            block.css("top", "0").css("left", "")
+            block.css("top", "0").css("left", "0")
             .css("position", "absolute").css("margin-left", offset + "px");
+
+            // return block;
         }
 
         return {
