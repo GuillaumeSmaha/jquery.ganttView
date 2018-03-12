@@ -9,6 +9,10 @@ Options
 -----------------
 showWeekends: boolean
 data: object
+buffer: number
+cellBuffer: number
+dateChunks: number
+updateDependencies: boolean
 cellWidth: number
 cellHeight: number
 slideWidth: number
@@ -25,6 +29,7 @@ behavior: {
     onResize: function
 }
 */
+var dayInMS = 86400000;
 
 (function (jQuery) {
 
@@ -44,7 +49,10 @@ behavior: {
         var els = this;
         var defaults = {
             showWeekends: true,
-            dateChunks: 1, //default to day
+            buffer: 1, //default to 1 day buffer (number of days to add to the grid pre/post start/end)
+            cellBuffer: 5, //number of cells to display prior to the start time
+            dateChunks: 1, //default to day (how many chunks to split each day into [ie how many cells make up one day])
+            updateDependencies: false, //default to false to maintain backwards compatibility
             cellWidth: 21,
             cellHeight: 31,
             slideWidth: 400,
@@ -62,37 +70,17 @@ behavior: {
         var opts = jQuery.extend(true, defaults, options);
 
         if (opts.data) {
-            opts.data.forEach(function (feature) {
-                if (feature.series) {
-                    let prevEnd;
-                    feature.series.forEach(function (item) {
-                        if (!prevEnd) {
-                            prevEnd = Date.parse(item.end);
-                        }
-                        else if (item.start < prevEnd) {
-                            var start = Date.parse(item.start);
-                            var end = Date.parse(item.end);
-                            var timeDiff = prevEnd - start;
-
-                            item.start = prevEnd;
-                            item.end = new Date(end.getTime() + timeDiff);
-
-                            prevEnd = end;
-                        }
-                    });
-                }
-            });
-
             build();
         } else if (opts.dataUrl) {
             jQuery.getJSON(opts.dataUrl, function (data) { opts.data = data; build(); });
         }
         
         function build() {
-            var minDays = Math.floor((opts.slideWidth / opts.cellWidth)  + 5);
-            var startEnd = DateUtils.getBoundaryDatesFromData(opts.data, minDays);
+            var minCells = Math.floor((opts.slideWidth / opts.cellWidth)  + 5);
+            var startEnd = DateUtils.getBoundaryDatesFromData(opts.data, opts.dateChunks, opts.buffer, minCells);
             opts.start = startEnd[0];
             opts.end = startEnd[1];
+            opts.chunksToStartTime = startEnd[2];
 
             els.each(function () {
                 var container = jQuery(this);
@@ -127,7 +115,7 @@ behavior: {
 
         function render() {
 
-            addVtHeader(div, opts.data, opts.cellHeight, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
+            addVtHeader(div, opts.data, opts.dateChunks, opts.cellHeight, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
 
             var slideDiv = jQuery("<div>", {
                 "class": "ganttview-slide-container",
@@ -136,9 +124,9 @@ behavior: {
             
             dates = getDates(opts.start, opts.end);
 
-            addHzHeader(slideDiv, dates, opts.dateChunks, opts.cellWidth);
+            addHzHeader(slideDiv, opts.start, dates, opts.dateChunks, opts.cellWidth);
             addGrid(slideDiv, opts.data, dates, opts.dateChunks, opts.cellWidth, opts.cellHeight, opts.showWeekends, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
-            addBlockContainers(slideDiv, opts.data, opts.cellHeight, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
+            addBlockContainers(slideDiv, opts.data, opts.dateChunks, opts.cellHeight, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
             addBlocks(slideDiv, opts.data, opts.dateChunks, opts.cellWidth, opts.cellHeight, opts.start, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
             div.append(slideDiv);
             applyLastClass(div.parent());
@@ -169,10 +157,14 @@ behavior: {
             return dates;
         }
 
-        function addVtHeader(div, data, cellHeight, groupBySeries, groupById, groupByIdDrawAllTitles) {
+        function addVtHeader(div, data, dateChunks, cellHeight, groupBySeries, groupById, groupByIdDrawAllTitles) {
             var listId = {};
             var rowIdx = 1;
-            var headerDiv = jQuery("<div>", { "class": "ganttview-vtheader" });
+            var vthHeight = 61;
+            if(dateChunks <= 1){ vthHeight = 41; }
+            var headerDiv = jQuery("<div>", { 
+                                                "class": "ganttview-vtheader",
+                                                "css": { "margin-top": vthHeight + "px" } });
             for (var i = 0; i < data.length; i++)
             {
                 if(groupBySeries)
@@ -258,7 +250,7 @@ behavior: {
             div.append(headerDiv);
         }
 
-        function addHzHeader(div, dates, dateChunks, cellWidth) {
+        function addHzHeader(div, startDate, dates, dateChunks, cellWidth) {
             var headerDiv = jQuery("<div>", { "class": "ganttview-hzheader" });
             var monthsDiv = jQuery("<div>", { "class": "ganttview-hzheader-months" });
             var daysDiv = jQuery("<div>", { "class": "ganttview-hzheader-days" });
@@ -275,34 +267,52 @@ behavior: {
                         "css": { "width": (w - 1) + "px" }
                     }).append(monthNames[mCount] + "/" + y));
 
-                    dCount = 1;
-
                     m.forEach(function (d) {
                         daysDiv.append(jQuery("<div>", { 
                             "class": "ganttview-hzheader-day",
                             "css": { "width": (cellWidth*dateChunks - 1) + "px" }
-                        }).append(dCount));
+                        }).append(d.getDate()));
 
-                        if(dateChunk > 1){
-                            let hourMark = Math.parseInt(24/dateChunk);
+                        if(dateChunks > 1){
+                            let dayInMin = 2400;
+                            let timeDiff = dayInMin/dateChunks;
+                            let timeMark = 0;
 
                             for(var dateChunk=0; dateChunk < dateChunks; ++dateChunk){
-                                if (dateChunk%hourMark != 0){
-                                    chunksDiv.append(jQuery("<div>", {
-                                        "class": "ganttview-hzheader-chunk",
-                                        "css": { "width": (cellWidth) + "px" }
-                                    }) )
+                                var rightBorder = "1px solid #f0f0f0";
+                                var cellTime = -1, cellText = "";
+
+                                if (dateChunk == dateChunks - 1){ rightBorder = "1px solid #9999"; }
+                                
+                                if(dateChunk%2 == 0){
+                                    if(timeMark%100 == 0){
+                                        cellTime = timeMark;
+                                    }
+                                    else{
+                                        var hourDecimal = timeMark%100;
+                                        var minutes = hourDecimal*3/5;
+                                        cellTime = timeMark - hourDecimal + minutes; 
+                                    }
                                 }
-                                else {
-                                    chunksDiv.append(jQuery("<div>", {
-                                        "class": "ganttview-hzheader-chunk",
-                                        "css": { "width": (cellWidth) + "px" }
-                                    }).append(dateChunk));
+
+                                if(cellTime > -1){
+                                    cellText = cellTime.toString();
+                                    while(cellText.length < 4){
+                                        cellText = "0" + cellText;
+                                    }
                                 }
+
+                                chunksDiv.append(jQuery("<div>", {
+                                    "class": "ganttview-hzheader-chunk",
+                                    "css": { 
+                                        "width": (cellWidth-1) + "px",
+                                        "border-right": rightBorder
+                                    }
+                                }).append(cellText));
+
+                                timeMark += timeDiff;
                             }
                         }
-
-                        ++dCount;
                     })
                     ++mCount;
                 })
@@ -318,6 +328,7 @@ behavior: {
         function addGrid(div, data, dates, dateChunks, cellWidth, cellHeight, showWeekends, groupBySeries, groupById, groupByIdDrawAllTitles) {
             var gridDiv = jQuery("<div>", { "class": "ganttview-grid" });
             var rowDiv = jQuery("<div>", { "class": "ganttview-grid-row" }).css('height', cellHeight);
+
             for (var y in dates) {
                 for (var m in dates[y]) {
                     for (var d in dates[y][m]) {
@@ -380,10 +391,15 @@ behavior: {
             div.append(gridDiv);
         }
 
-        function addBlockContainers(div, data, cellHeight, groupBySeries, groupById, groupByIdDrawAllTitles) {
+        function addBlockContainers(div, data, dateChunks, cellHeight, groupBySeries, groupById, groupByIdDrawAllTitles) {
             var rowIdx = 1;
             var listId = {};
-            var blocksDiv = jQuery("<div>", { "class": "ganttview-blocks" });
+            var blockOffset = 60;
+            if (dateChunks <= 1) { blockOffset = 40; }
+            var blocksDiv = jQuery("<div>", { 
+                                                "class": "ganttview-blocks",
+                                                "css": { "margin-top": blockOffset + "px" } 
+                                            });
             for (var i = 0; i < data.length; i++)
             {
                 if(groupBySeries)
@@ -439,113 +455,58 @@ behavior: {
                     {
                        if(typeof listId[ id ] == "undefined")
                         {
-                            for (var j = 0; j < data[i].series.length; j++)
-                            {
-                                var series = data[i].series[j];
-                                var size = (DateUtils.daysBetween(series.start, series.end) + 1) * dateChunks;
-                                var offset = DateUtils.daysBetween(start, series.start)*dateChunks;
-                                var block = jQuery("<div>", {
-                                  "class": "ganttview-block",
-                                  "title": series.name + ", " + size/dateChunks + " hrs",
-                                  "css": {
-                                      "height": (parseInt(jQuery(rows[rowIdx]).css('height'), 10) - 4) + "px",
-                                      "width": ((size * cellWidth) - 9) + "px",
-                                      "margin-left": ((offset * cellWidth) + 3) + "px",
-                                      "top": 0
-                                    }
-                                });
-                                addBlockData(block, data[i], series);
-                                if (data[i].series[j].color) {
-                                    block.css("background-color", data[i].series[j].color);
-                                }
-                                block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size/dateChunks));
-                                jQuery(rows[rowIdx]).append(block);
-                            }
+                            generateBlock(data[i], rows, rowIdx, groupBySeries, start, dateChunks, cellWidth);
 
                             listId[ id ] = rowIdx;
-
                             rowIdx = rowIdx + 1;
                         }
                         else
                         {
-                            for (var j = 0; j < data[i].series.length; j++)
-                            {
-                                var series = data[i].series[j];
-                                var size = (DateUtils.daysBetween(series.start, series.end) + 1) * dateChunks;
-                                var offset = DateUtils.daysBetween(start, series.start)*dateChunks;
-                                var block = jQuery("<div>", {
-                                  "class": "ganttview-block",
-                                  "title": series.name + ", " + size/dateChunks + " days",
-                                  "css": {
-                                      "height": (parseInt(jQuery(rows[ listId[ id ] ]).css('height'), 10) - 4) + "px",
-                                      "width": ((size * cellWidth) - 9) + "px",
-                                      "margin-left": ((offset * cellWidth) + 3) + "px",
-                                      "top": 0
-                                    }
-                                });
-                                addBlockData(block, data[i], series);
-                                if (data[i].series[j].color) {
-                                    block.css("background-color", data[i].series[j].color);
-                                }
-                                block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size/dateChunks));
-                                jQuery(rows[ listId[ id ] ]).append(block);
-                            }
+                            generateBlock(data[i], rows, listId[ id ], groupBySeries, start, dateChunks, cellWidth);
                         }
                     }
                     else
                     {
-                        for (var j = 0; j < data[i].series.length; j++)
-                        {
-                            var series = data[i].series[j];
-                            var size = (DateUtils.daysBetween(series.start, series.end) + 1) * dateChunks;
-                            var offset = DateUtils.daysBetween(start, series.start)*dateChunks;
-                            var block = jQuery("<div>", {
-                              "class": "ganttview-block",
-                              "title": series.name + ", " + size/dateChunks + " days",
-                              "css": {
-                                  "height": (parseInt(jQuery(rows[rowIdx]).css('height'), 10) - 4) + "px",
-                                  "width": ((size * cellWidth) - 9) + "px",
-                                  "margin-left": ((offset * cellWidth) + 3) + "px",
-                                  "top": 0,
-                              }
-                            });
-                            addBlockData(block, data[i], series);
-                            if (data[i].series[j].color) {
-                                block.css("background-color", data[i].series[j].color);
-                            }
-                            block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size/dateChunks));
-                            jQuery(rows[rowIdx]).append(block);
-                        }
+                        generateBlock(data[i], rows, rowIdx, groupBySeries, start, dateChunks, cellWidth);
+
                         rowIdx = rowIdx + 1;
                     }
                 }
                 else
                 {
-                    for (var j = 0; j < data[i].series.length; j++)
-                    {
-                        var series = data[i].series[j];
-                        var size = DateUtils.daysBetween(series.start, series.end) + 1;
-                        var offset = DateUtils.daysBetween(start, series.start);
-                        var block = jQuery("<div>", {
-                            "class": "ganttview-block",
-                            "title": series.name + ", " + size + " days",
-                            "css": {
-                                "height": (parseInt(jQuery(rows[rowIdx]).css('height'), 10) - 4) + "px",
-                                "width": ((size * cellWidth) - 9) + "px",
-                                "margin-left": ((offset * cellWidth) + 3) + "px",
-                                "top": "0px"
-                            }
-                        });
-                        addBlockData(block, data[i], series);
-                        if (data[i].series[j].color) {
-                            block.css("background-color", data[i].series[j].color);
-                        }
-                        block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size));
-                        jQuery(rows[rowIdx]).append(block);
-                        rowIdx = rowIdx + 1;
-                    }
+                    rowIdx = generateBlock(data[i], rows, rowIdx, groupBySeries, start, dateChunks, cellWidth);
                 }
             }
+        }
+
+        function generateBlock(dataItem, rows, index, groupBySeries, start, dateChunks, cellWidth){ 
+            for (var j = 0; j < dataItem.series.length; j++)
+            {
+                var series = dataItem.series[j];                          
+                var size = DateUtils.timeInChunksBetween(series.start, series.end, dateChunks);
+                var offset = DateUtils.timeInChunksBetween(start, series.start, dateChunks);
+
+                var block = jQuery("<div>", {
+                  "class": "ganttview-block",
+                  "title": series.name + ", " + size/dateChunks*24 + " hrs",
+                  "css": {
+                      "height": (parseInt(jQuery(rows[index]).css('height'), 10) - 4) + "px",
+                      "width": ((size * cellWidth) - 9) + "px",
+                      "margin-left": ((offset * cellWidth) + 3) + "px",
+                      "top": 0
+                    }
+                });
+                addBlockData(block, dataItem, series);
+                if (dataItem.series[j].color) {
+                    block.css("background-color", dataItem.series[j].color);
+                }
+                block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size/dateChunks*24));
+                jQuery(rows[index]).append(block);
+
+                if (!groupBySeries) { ++index; }
+            } 
+
+            return index;
         }
 
         function addBlockData(block, data, series) {
@@ -570,17 +531,18 @@ behavior: {
     var Behavior = function (div, opts) {
 
         function apply() {
+            jQuery("div.ganttview-slide-container", div).scrollLeft(getScrollTo(opts.buffer, opts.dateChunks, opts.chunksToStartTime, opts.cellWidth, opts.cellBuffer));
 
             if (opts.behavior.clickable) { 
                 bindBlockClick(div, opts.behavior.onClick); 
             }
             
             if (opts.behavior.resizable) { 
-                bindBlockResize(div, opts.dateChunks, opts.cellWidth, opts.start, opts.behavior.onResize); 
+                bindBlockResize(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.updateDependencies, opts.behavior.onResize); 
             }
             
             if (opts.behavior.draggable) { 
-                bindBlockDrag(div, opts.dateChunks, opts.cellWidth, opts.start, opts.behavior.onDrag); 
+                bindBlockDrag(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.updateDependencies, opts.behavior.onDrag); 
             }
         }
 
@@ -590,167 +552,144 @@ behavior: {
             });
         }
         
-        function bindBlockResize(div, dateChunks, cellWidth, startDate, callback) {
+        function bindBlockResize(div, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, callback) {
             jQuery("div.ganttview-block", div).resizable({
                 grid: cellWidth, 
                 handles: "e",
                 stop: function () {
                     var block = jQuery(this);
+                    var updatedData = [];
 
-                    var container = jQuery("div.ganttview-slide-container", div);
-                    var scroll = container.scrollLeft();
-                    var offset = block.offset().left - container.offset().left - 1 + scroll;
-
-                    updateDataAndPosition(offset, block, dateChunks, cellWidth, startDate);
-                    if (callback) { callback(block.data("block-data")); }
+                    updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies);
+                    if (callback) { callback(updatedData); }
                 }
             });
         }
         
-        function bindBlockDrag(div, dateChunks, cellWidth, startDate, callback) {
+        function bindBlockDrag(div, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, callback) {
             jQuery("div.ganttview-block", div).draggable({
                 axis: "x", 
                 grid: [cellWidth, cellWidth],
                 stop: function () {
                     var block = jQuery(this);
+                    var updatedData = [];
 
-                    console.log(this);
-
-                    var container = jQuery("div.ganttview-slide-container", div);
-                    var scroll = container.scrollLeft();
-                    var offset = block.offset().left - container.offset().left - 1 + scroll;
-
-                    updateDataAndPosition(offset, block, dateChunks, cellWidth, startDate);
-                    if (callback) { callback(block.data("block-data")); }
+                    updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies);
+                    if (callback) { callback(updatedData); }
                 }
             });
         }
         
-        function updateDataAndPosition(offset, block, dateChunks, cellWidth, startDate) {
-            var parent = block[0].parentElement;
-            var childElementCount = parent.childElementCount;
+        function updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies) {
+            var parentChildren = block.parent().children();
+            var childElementCount = parentChildren.length;
             var index;
+
+            var container = jQuery("div.ganttview-slide-container", div);
+            var scroll = container.scrollLeft();
+            var offset = block.offset().left - container.offset().left - 1 + scroll;
 
             let i=0;
 
             while (!index && i<childElementCount){
-                if(parent.childNodes[i] == block[0]){
+                if(parentChildren[i] == block[0]){
                     index = i;
                 }
                 ++i;
             }
 
-            // console.log(block);
-
             // Set new start date
-            var dayInMS = 86400000;
             var chunkInMS = dayInMS/dateChunks;
 
             var chunksFromStart = Math.round(offset / cellWidth);
-            var newStart = new Date(startDate.getTime() + (chunksFromStart*chunkInMS));
+
+            var newStart = new Date(startDate.clone().getTime() + (chunksFromStart*chunkInMS));
+
+            var startChanged = newStart.valueOf()!=block.data("block-data").start.valueOf();
+
+            block.data("block-data").start = newStart;
 
             // Set new end date
             var width = block.outerWidth();
-            var chunksFromStartToEnd = parseInt(width / cellWidth);
+            var chunksFromStartToEnd = parseInt(width / cellWidth) + 1;
             var newEnd = new Date(newStart.clone().getTime() + (chunksFromStartToEnd*chunkInMS));
 
-            //updateDataAndPosition for next element in series
-            //nextSibling, nextElementSibling, 
-            //offsetParent.childNodes, offsetParent.children, offsetParent.lastChild, offsetParent.lastElementChild
-            //parentElement.childNodes, parentElement.children, parentElement.lastChild, parentElement.lastElementChild
-            //parentNode.childNodes, parentNode.children, parentNode.lastChild, parentNode.lastElementChild
+            var endChanged = newEnd.valueOf()!=block.data("block-data").end.valueOf();
 
-            block.data("block-data").start = newStart;
+            var chunksDiff = DateUtils.timeInChunksBetween(block.data("block-data").end, newEnd, dateChunks);
+
             block.data("block-data").end = newEnd;
 
-            jQuery("div.ganttview-block-text", block).text(chunksFromStartToEnd/dateChunks + 1);
-
-            
-
-            //if previousSibling update?
-            //if nextSibling
-            if(index < childElementCount-1){
-                // var newBlock = block.clone();
-                // newBlock[0] = block.parent().children()[index+1];
-                // newBlock.context = block.parent().children()[index+1];
-
-                // var parents = ["offsetParent", "parentElement", "parentNode"];
-                // var children = ["childNodes", "children"];
-                // var lastChildren = ["lastChild", "lastElementChild"];
-
-                // var updatedChild = 
-                updateDataAndPosition(offset + width, jQuery(block.parent().children()[index+1]), dateChunks, cellWidth, newEnd);
-
-                // for (var p in parents) {
-                //     for (var c in children) {
-                //         parent[parents[p]][children[c]][index + 1] = updatedChild[0];
-                //         block.context[parents[p]][children[c]][index + 1] = updatedChild[0];
-                //     }
-
-                //     for (var lc in lastChildren){
-                //         parent[parents[p]][lastChildren[lc]] = updatedChild[0][parents[p]][lastChildren[lc]];
-                //         block.context[parents[p]][lastChildren[lc]] = updatedChild[0][parents[p]][lastChildren[lc]];
-                //     }
-                // }
-            }
-            while (index > 1){
-                --index;
-                // var newBlock = block.clone();
-                // newBlock[0] = block.parent().children()[index+1];
-                // newBlock.context = block.parent().children()[index+1];
-
-                // var parents = ["offsetParent", "parentElement", "parentNode"];
-                // var children = ["childNodes", "children"];
-                // var lastChildren = ["lastChild", "lastElementChild"];
-
-                // var updatedChild = 
-                //updateDataAndPosition(offset + width, jQuery(block.parent().children()[index]), dateChunks, cellWidth, newEnd);
-
-                // for (var p in parents) {
-                //     for (var c in children) {
-                //         parent[parents[p]][children[c]][index + 1] = updatedChild[0];
-                //         block.context[parents[p]][children[c]][index + 1] = updatedChild[0];
-                //     }
-
-                //     for (var lc in lastChildren){
-                //         parent[parents[p]][lastChildren[lc]] = updatedChild[0][parents[p]][lastChildren[lc]];
-                //         block.context[parents[p]][lastChildren[lc]] = updatedChild[0][parents[p]][lastChildren[lc]];
-                //     }
-                // }
-            }
-
-            var parentChildren = block.parent().children();
-
-            // for(i=0; i<parentChildren.length; ++i){
-            //     // Set new end date
-            //     console.log(parentChildren[i]);
-            //     var newBlock = block.clone();
-            //     newBlock[0] = parentChildren[i];
-            //     newBlock.context = parentChildren[i];
-
-            //     var width = newBlock.outerWidth();
-            //     var chunksFromStart = parseInt(width / cellWidth);
-            //     var newEnd = new Date(newStart.clone().getTime() + (chunksFromStart*chunkInMS));
-
-            //     parentChildren[i].data("block-data").start = newStart;
-            //     parentChildren[i].data("block-data").end = newEnd;
-
-            //     jQuery("div.ganttview-block-text", parentChildren[i]).text(chunksFromStart/dateChunks + 1);
-
-            //     // Remove top and left properties to avoid incorrect block positioning,
-            //     // set position to relative to keep blocks relative to scrollbar when scrolling
-            //     parentChildren[i].css("top", "0").css("left", "")
-            //     .css("position", "absolute").css("margin-left", offset + "px");
-
-            //     newStart = newEnd;
-            // }
+            jQuery("div.ganttview-block-text", block).text(parseInt(chunksFromStartToEnd/dateChunks)+1);
 
             // Remove top and left properties to avoid incorrect block positioning,
             // set position to relative to keep blocks relative to scrollbar when scrolling
             block.css("top", "0").css("left", "0")
             .css("position", "absolute").css("margin-left", offset + "px");
 
-            // return block;
+            updatedData.push(block.data("block-data"));
+
+            //if nextSibling
+            if(updateDependencies && index < childElementCount-1 && endChanged){
+                updateFollowing(offset + width, chunksDiff, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
+            }
+        }
+
+        function updateFollowing(offset, offsetChunks, block, updatedData, dateChunks, cellWidth){
+            var parentChildren = block.parent().children();
+            var childElementCount = parentChildren.length;
+            var index;
+
+            let i=0;
+
+            while (!index && i<childElementCount){
+                if(parentChildren[i] == block[0]){
+                    index = i;
+                }
+                ++i;
+            }
+
+            // Set new start date
+            var chunkInMS = dayInMS/dateChunks;
+            var oldStart = block.data("block-data").start
+
+            var newStart = new Date(oldStart.clone().getTime() + (offsetChunks*chunkInMS));
+
+            var startChanged = newStart.valueOf()!=block.data("block-data").start.valueOf();
+
+            block.data("block-data").start = newStart;
+
+            // Set new end date
+            var width = block.outerWidth();
+            var chunksFromStartToEnd = parseInt(width / cellWidth) + 1;
+            var newEnd = new Date(newStart.clone().getTime() + (chunksFromStartToEnd*chunkInMS));
+
+            var endChanged = newEnd.valueOf()!=block.data("block-data").end.valueOf();
+
+            block.data("block-data").end = newEnd;
+
+            jQuery("div.ganttview-block-text", block).text(parseInt(chunksFromStartToEnd/dateChunks)+1);
+
+            pixelOffset = parseFloat(block.css("margin-left")) + (offsetChunks*cellWidth);
+
+            // Remove top and left properties to avoid incorrect block positioning,
+            // set position to relative to keep blocks relative to scrollbar when scrolling
+            block.css("top", "0").css("left", "0")
+            .css("position", "absolute").css("margin-left", pixelOffset + "px");
+
+            updatedData.push(block.data("block-data"));
+
+            //if nextSibling
+            if(index < childElementCount-1 && endChanged){
+                updateFollowing(pixelOffset + width, offsetChunks, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
+            }
+        }
+
+        function getScrollTo(buffer, dateChunks, chunksToStartTime, cellWidth, cellBuffer){
+            var bufferInChunks = buffer*dateChunks;
+
+            return (bufferInChunks + chunksToStartTime - cellBuffer) * cellWidth
+
         }
 
         return {
@@ -773,38 +712,43 @@ behavior: {
 
     var DateUtils = {
 
-        daysBetween: function (start, end) {
-            if (!start || !end) { return 0; }
-            start = Date.parse(start); end = Date.parse(end);
-            if (start.getYear() == 1901 || end.getYear() == 8099) { return 0; }
-            var count = 0, date = start.clone();
-            while (date.compareTo(end) == -1) { count = count + 1; date.addDays(1); }
-            return count;
+        timeInChunksBetween: function (start, end, dateChunks) {
+            var timeInMs = end.valueOf() - start.valueOf();
+
+            return timeInMs*dateChunks/dayInMS;
         },
 
         isWeekend: function (date) {
             return date.getDay() % 6 == 0;
         },
 
-        getBoundaryDatesFromData: function (data, minDays) {
+        getBoundaryDatesFromData: function (data, dateChunks, buffer, minCells) {
             var minStart = new Date(); maxEnd = new Date();
+            var chunksToStartTime;
             for (var i = 0; i < data.length; i++) {
                 for (var j = 0; j < data[i].series.length; j++) {
-                    var start = Date.parse(data[i].series[j].start);
-                    var end = Date.parse(data[i].series[j].end)
+                    var start = Date.parse(data[i].series[j].start).clone();
+                    var end = Date.parse(data[i].series[j].end).clone()
                     if (i == 0 && j == 0) { minStart = start; maxEnd = end; }
                     if (minStart.compareTo(start) == 1) { minStart = start; }
                     if (maxEnd.compareTo(end) == -1) { maxEnd = end; }
                 }
             }
 
-            // Insure that the width of the chart is at least the slide width to avoid empty
-            // whitespace to the right of the grid
-            if (DateUtils.daysBetween(minStart, maxEnd) < minDays) {
-                maxEnd = minStart.clone().addDays(minDays);
+            let zeroedStart = new Date(minStart.clone().setHours(0)).setMinutes(0);
+
+            chunksToStartTime = Math.floor(DateUtils.timeInChunksBetween(zeroedStart, minStart, dateChunks));
+
+            //start at midnight
+            if(minStart.getHours() > 0 || minStart.getMinutes() > 0){
+                minStart = new Date(zeroedStart);
             }
+
+            //add boundary dates to either end
+            minStart.addDays(-1*buffer);
+            maxEnd.addDays(buffer);
             
-            return [minStart, maxEnd];
+            return [minStart, maxEnd, chunksToStartTime];
         }
     };
 
