@@ -37,18 +37,18 @@
 				updateDependencies: true,
 				behavior: {
 					onClick: function (data) { 
-						var msg = "You clicked on an event: { start: " + data.start.toString("M/d/yyyy H:MM") + ", end: " + data.end.toString("M/d/yyyy H:MM") + " }";
+						var msg = "You clicked on an event: { start: " + data.start.toString("M/d/yyyy H:mm") + ", end: " + data.end.toString("M/d/yyyy H:mm") + " }";
 						$("#eventMessage").text(msg);
 					},
 					onResize: function (uData) { 
-						var msg = "You resized an event: { start: " + uData[uData.length-1].start.toString("M/d/yyyy H:MM") + ", end: " + uData[uData.length-1].end.toString("M/d/yyyy H:MM") + " }";
+						var msg = "You resized an event: { start: " + uData[uData.length-1].start.toString("M/d/yyyy H:mm") + ", end: " + uData[uData.length-1].end.toString("M/d/yyyy H:mm") + " }";
 						$("#eventMessage").text(msg);
 						//call function updateIfChanged
 						updatedData = uData;
 						console.log(updatedData);
 					},
 					onDrag: function (uData) { 
-						var msg = "You dragged an event: { start: " + uData[uData.length-1].start.toString("M/d/yyyy H:MM") + ", end: " + uData[uData.length-1].end.toString("M/d/yyyy H:MM") + " }";
+						var msg = "You dragged an event: { start: " + uData[uData.length-1].start.toString("M/d/yyyy H:mm") + ", end: " + uData[uData.length-1].end.toString("M/d/yyyy H:mm") + " }";
 						$("#eventMessage").text(msg);
 						//call function updateIfChanged
 						updatedData = uData;
@@ -60,6 +60,5 @@
 			// $("#ganttChart").ganttView("setSlideWidth", 600);
 		});
 	</script>
-
 </body>
 </html>

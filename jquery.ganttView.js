@@ -290,7 +290,8 @@ var dayInMS = 86400000;
                                     }
                                     else{
                                         var hourDecimal = timeMark%100;
-                                        var minutes = hourDecimal*3/5;
+                                        var minutes = Math.round(hourDecimal*3/5);
+                                        if(minutes == 60){ minutes = 100; }
                                         cellTime = timeMark - hourDecimal + minutes; 
                                     }
                                 }
@@ -486,13 +487,15 @@ var dayInMS = 86400000;
                 var size = DateUtils.timeInChunksBetween(series.start, series.end, dateChunks);
                 var offset = DateUtils.timeInChunksBetween(start, series.start, dateChunks);
 
+                var time = DateUtils.chunksToTime(size, dateChunks);
+
                 var block = jQuery("<div>", {
                   "class": "ganttview-block",
-                  "title": series.name + ", " + size/dateChunks*24 + " hrs",
+                  "title": series.name + ", " + time.hrs + " hrs " + time.mins + " mins",
                   "css": {
                       "height": (parseInt(jQuery(rows[index]).css('height'), 10) - 4) + "px",
-                      "width": ((size * cellWidth) - 9) + "px",
-                      "margin-left": ((offset * cellWidth) + 3) + "px",
+                      "width": ((size * (cellWidth)) - (9/dateChunks)) + "px",
+                      "margin-left": ((offset * cellWidth)) + "px",
                       "top": 0
                     }
                 });
@@ -601,7 +604,7 @@ var dayInMS = 86400000;
             // Set new start date
             var chunkInMS = dayInMS/dateChunks;
 
-            var chunksFromStart = Math.round(offset / cellWidth);
+            var chunksFromStart = (offset / cellWidth);
 
             var newStart = new Date(startDate.clone().getTime() + (chunksFromStart*chunkInMS));
 
@@ -611,7 +614,8 @@ var dayInMS = 86400000;
 
             // Set new end date
             var width = block.outerWidth();
-            var chunksFromStartToEnd = parseInt(width / cellWidth) + 1;
+            var chunksFromStartToEnd = (width / (cellWidth+.5));
+
             var newEnd = new Date(newStart.clone().getTime() + (chunksFromStartToEnd*chunkInMS));
 
             var endChanged = newEnd.valueOf()!=block.data("block-data").end.valueOf();
@@ -655,16 +659,16 @@ var dayInMS = 86400000;
 
             var newStart = new Date(oldStart.clone().getTime() + (offsetChunks*chunkInMS));
 
-            var startChanged = newStart.valueOf()!=block.data("block-data").start.valueOf();
+            var startChanged = newStart.valueOf()!=oldStart.valueOf();
 
             block.data("block-data").start = newStart;
 
             // Set new end date
-            var width = block.outerWidth();
-            var chunksFromStartToEnd = parseInt(width / cellWidth) + 1;
+            var oldEnd = block.data("block-data").end;
+            var chunksFromStartToEnd = DateUtils.timeInChunksBetween(oldStart, oldEnd, dateChunks);
             var newEnd = new Date(newStart.clone().getTime() + (chunksFromStartToEnd*chunkInMS));
 
-            var endChanged = newEnd.valueOf()!=block.data("block-data").end.valueOf();
+            var endChanged = newEnd.valueOf()!=oldEnd.valueOf();
 
             block.data("block-data").end = newEnd;
 
@@ -681,7 +685,7 @@ var dayInMS = 86400000;
 
             //if nextSibling
             if(index < childElementCount-1 && endChanged){
-                updateFollowing(pixelOffset + width, offsetChunks, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
+                updateFollowing(pixelOffset + chunksFromStartToEnd*cellWidth, offsetChunks, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
             }
         }
 
@@ -711,6 +715,16 @@ var dayInMS = 86400000;
     };
 
     var DateUtils = {
+        chunksToTime(size, dateChunks){
+            var timeInMs = size/dateChunks;
+            var hrsDec = timeInMs * 24;
+            var hrs, mins;
+
+            hrsDec % 1 == 0 ? hrs = hrsDec : hrs = Math.floor(hrsDec);
+            mins = Math.round(60*(hrsDec - hrs));
+
+            return {hrs, mins}
+        },
 
         timeInChunksBetween: function (start, end, dateChunks) {
             var timeInMs = end.valueOf() - start.valueOf();
