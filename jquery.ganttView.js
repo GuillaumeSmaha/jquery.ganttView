@@ -620,7 +620,8 @@ var dayInMS = 86400000;
 
             var endChanged = newEnd.valueOf()!=oldEnd.valueOf();
 
-            var newText = parseInt(DateUtils.timeInChunksBetween(newStart, newEnd, dateChunks)/dateChunks)+1;
+            var newDuration = DateUtils.chunksToTime(DateUtils.timeInChunksBetween(newStart, newEnd, dateChunks), dateChunks);
+            var newText = newDuration.hrs;
 
             updateBlockDataAndCss(block, newStart, newEnd, newText, offset);
             updatedData.push(block.data("block-data"));
@@ -679,7 +680,6 @@ var dayInMS = 86400000;
             var chunksFromOldDateToNewDate = DateUtils.timeInChunksBetween(oldDate, newDate, dateChunks);
             var offsetChunks = Math.floor(chunksFromOldDateToNewDate) - chunksFromOldDate;
 
-            console.log(offsetChunks);
             return chunksFromOldDateToNewDate - offsetChunks;
         }
 
@@ -687,7 +687,6 @@ var dayInMS = 86400000;
             var chunkInMS = dayInMS/dateChunks;
 
             return new Date(oldDate.clone().getTime() + (offsetChunks*chunkInMS));
-
         }
 
         function updateBlockDataAndCss(block, newStart, newEnd, newText, pixelOffset){
