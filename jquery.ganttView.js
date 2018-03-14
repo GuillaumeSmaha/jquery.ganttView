@@ -563,7 +563,7 @@ var dayInMS = 86400000;
                     var block = jQuery(this);
                     var updatedData = [];
 
-                    updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies);
+                    updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, true);
                     if (callback) { callback(updatedData); }
                 }
             });
@@ -577,13 +577,13 @@ var dayInMS = 86400000;
                     var block = jQuery(this);
                     var updatedData = [];
 
-                    updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies);
+                    updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, false);
                     if (callback) { callback(updatedData); }
                 }
             });
         }
         
-        function updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies) {
+        function updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, isResize) {
             var parentChildren = block.parent().children();
             var childElementCount = parentChildren.length;
             var index;
@@ -602,37 +602,30 @@ var dayInMS = 86400000;
             }
 
             // Set new start date
-            var chunkInMS = dayInMS/dateChunks;
+            var oldStart = block.data("block-data").start
+            var offsetChunks = getOffsetChunks(startDate, oldStart, offset, cellWidth, dateChunks);
 
-            var chunksFromStart = (offset / cellWidth);
-
-            var newStart = new Date(startDate.clone().getTime() + (chunksFromStart*chunkInMS));
-
-            var startChanged = newStart.valueOf()!=block.data("block-data").start.valueOf();
-
-            block.data("block-data").start = newStart;
+            var newStart = updateDate(startDate, offsetChunks, dateChunks);
 
             // Set new end date
+            var oldEnd = block.data("block-data").end;
             var width = block.outerWidth();
-            var chunksFromStartToEnd = (width / (cellWidth+.5));
+            var offsetChunks;
 
-            var newEnd = new Date(newStart.clone().getTime() + (chunksFromStartToEnd*chunkInMS));
+            isResize
+                ? offsetChunks = getOffsetChunks(oldStart, oldEnd, width, cellWidth, dateChunks)
+                : offsetChunks = DateUtils.timeInChunksBetween(oldStart, oldEnd, dateChunks);
 
-            var endChanged = newEnd.valueOf()!=block.data("block-data").end.valueOf();
+            var newEnd = updateDate(newStart, offsetChunks, dateChunks);
 
-            var chunksDiff = DateUtils.timeInChunksBetween(block.data("block-data").end, newEnd, dateChunks);
+            var endChanged = newEnd.valueOf()!=oldEnd.valueOf();
 
-            block.data("block-data").end = newEnd;
+            var newText = parseInt(DateUtils.timeInChunksBetween(newStart, newEnd, dateChunks)/dateChunks)+1;
 
-            jQuery("div.ganttview-block-text", block).text(parseInt(chunksFromStartToEnd/dateChunks)+1);
-
-            // Remove top and left properties to avoid incorrect block positioning,
-            // set position to relative to keep blocks relative to scrollbar when scrolling
-            block.css("top", "0").css("left", "0")
-            .css("position", "absolute").css("margin-left", offset + "px");
-
+            updateBlockDataAndCss(block, newStart, newEnd, newText, offset);
             updatedData.push(block.data("block-data"));
 
+            var chunksDiff = DateUtils.timeInChunksBetween(oldEnd, newEnd, dateChunks);
             //if nextSibling
             if(updateDependencies && index < childElementCount-1 && endChanged){
                 updateFollowing(offset + width, chunksDiff, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
@@ -654,39 +647,58 @@ var dayInMS = 86400000;
             }
 
             // Set new start date
-            var chunkInMS = dayInMS/dateChunks;
             var oldStart = block.data("block-data").start
 
-            var newStart = new Date(oldStart.clone().getTime() + (offsetChunks*chunkInMS));
+            var newStart = updateDate(oldStart, offsetChunks, dateChunks);
 
             var startChanged = newStart.valueOf()!=oldStart.valueOf();
-
-            block.data("block-data").start = newStart;
 
             // Set new end date
             var oldEnd = block.data("block-data").end;
             var chunksFromStartToEnd = DateUtils.timeInChunksBetween(oldStart, oldEnd, dateChunks);
-            var newEnd = new Date(newStart.clone().getTime() + (chunksFromStartToEnd*chunkInMS));
+
+            var newEnd = updateDate(oldEnd, chunksFromStartToEnd, dateChunks);
+
+
+            var newText = parseInt(chunksFromStartToEnd/dateChunks)+1;
+            var pixelOffset = parseFloat(block.css("margin-left")) + (offsetChunks*cellWidth);
+
+            updateBlockDataAndCss(block, newStart, newEnd, newText, pixelOffset);
+            updatedData.push(block.data("block-data"));
 
             var endChanged = newEnd.valueOf()!=oldEnd.valueOf();
-
-            block.data("block-data").end = newEnd;
-
-            jQuery("div.ganttview-block-text", block).text(parseInt(chunksFromStartToEnd/dateChunks)+1);
-
-            pixelOffset = parseFloat(block.css("margin-left")) + (offsetChunks*cellWidth);
-
-            // Remove top and left properties to avoid incorrect block positioning,
-            // set position to relative to keep blocks relative to scrollbar when scrolling
-            block.css("top", "0").css("left", "0")
-            .css("position", "absolute").css("margin-left", pixelOffset + "px");
-
-            updatedData.push(block.data("block-data"));
 
             //if nextSibling
             if(index < childElementCount-1 && endChanged){
                 updateFollowing(pixelOffset + chunksFromStartToEnd*cellWidth, offsetChunks, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
             }
+        }
+
+        function getOffsetChunks(oldDate, newDate, offset, cellWidth, dateChunks){
+            var chunksFromOldDate = Math.floor(offset / cellWidth);
+            var chunksFromOldDateToNewDate = DateUtils.timeInChunksBetween(oldDate, newDate, dateChunks);
+            var offsetChunks = Math.floor(chunksFromOldDateToNewDate) - chunksFromOldDate;
+
+            console.log(offsetChunks);
+            return chunksFromOldDateToNewDate - offsetChunks;
+        }
+
+        function updateDate(oldDate, offsetChunks, dateChunks){
+            var chunkInMS = dayInMS/dateChunks;
+
+            return new Date(oldDate.clone().getTime() + (offsetChunks*chunkInMS));
+
+        }
+
+        function updateBlockDataAndCss(block, newStart, newEnd, newText, pixelOffset){
+            block.data("block-data").start = newStart;
+            block.data("block-data").end = newEnd;
+            jQuery("div.ganttview-block-text", block).text(newText);
+
+            // Remove top and left properties to avoid incorrect block positioning,
+            // set position to relative to keep blocks relative to scrollbar when scrolling
+            block.css("top", "0").css("left", "0")
+            .css("position", "absolute").css("margin-left", pixelOffset + "px");
         }
 
         function getScrollTo(buffer, dateChunks, chunksToStartTime, cellWidth, cellBuffer){
