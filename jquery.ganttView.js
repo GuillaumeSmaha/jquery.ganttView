@@ -52,6 +52,7 @@ var dayInMS = 86400000;
             buffer: 1, //default to 1 day buffer (number of days to add to the grid pre/post start/end)
             cellBuffer: 5, //number of cells to display prior to the start time
             dateChunks: 1, //default to day (how many chunks to split each day into [ie how many cells make up one day])
+            freezeDate: null, //default to no freezeDate
             updateDependencies: false, //default to false to maintain backwards compatibility
             cellWidth: 21,
             cellHeight: 31,
@@ -160,11 +161,22 @@ var dayInMS = 86400000;
         function addVtHeader(div, data, dateChunks, cellHeight, groupBySeries, groupById, groupByIdDrawAllTitles) {
             var listId = {};
             var rowIdx = 1;
-            var vthHeight = 61;
-            if(dateChunks <= 1){ vthHeight = 41; }
+            var vthHeight = 41;
             var headerDiv = jQuery("<div>", { 
                                                 "class": "ganttview-vtheader",
                                                 "css": { "margin-top": vthHeight + "px" } });
+            if(dateChunks > 1){
+                var itemDiv = jQuery("<div>", { "class": "ganttview-vtheader-item" });
+                itemDiv.append(jQuery("<div>", {
+                    "css": { 
+                        "height": cellHeight*2/3 + "px",
+                        "float":"right",
+                        "padding-right":cellHeight/4+"px",
+                        }
+                }).append("Time"));
+                headerDiv.append(itemDiv);
+            }
+
             for (var i = 0; i < data.length; i++)
             {
                 if(groupBySeries)
@@ -483,7 +495,7 @@ var dayInMS = 86400000;
         function generateBlock(dataItem, rows, index, groupBySeries, start, dateChunks, cellWidth){ 
             for (var j = 0; j < dataItem.series.length; j++)
             {
-                var series = dataItem.series[j];                          
+                var series = dataItem.series[j];
                 var size = DateUtils.timeInChunksBetween(series.start, series.end, dateChunks);
                 var offset = DateUtils.timeInChunksBetween(start, series.start, dateChunks);
 
@@ -540,12 +552,12 @@ var dayInMS = 86400000;
                 bindBlockClick(div, opts.behavior.onClick); 
             }
             
-            if (opts.behavior.resizable) { 
-                bindBlockResize(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.updateDependencies, opts.behavior.onResize); 
+            if (opts.behavior.resizable) {
+                bindBlockResize(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.updateDependencies, opts.behavior.onResize); 
             }
             
-            if (opts.behavior.draggable) { 
-                bindBlockDrag(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.updateDependencies, opts.behavior.onDrag); 
+            if (opts.behavior.draggable) {
+                bindBlockDrag(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.updateDependencies, opts.behavior.onDrag); 
             }
         }
 
@@ -555,35 +567,53 @@ var dayInMS = 86400000;
             });
         }
         
-        function bindBlockResize(div, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, callback) {
-            jQuery("div.ganttview-block", div).resizable({
-                grid: cellWidth, 
-                handles: "e",
-                stop: function () {
-                    var block = jQuery(this);
-                    var updatedData = [];
+        function bindBlockResize(div, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, callback) {
+            for(var block in jQuery("div.ganttview-block", div)){
+                if(block == parseInt(block)){
+                    var thisBlock = jQuery(jQuery("div.ganttview-block", div)[block]);
+                    var blockEnd = thisBlock.data("block-data").end;
 
-                    updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, true);
-                    if (callback) { callback(updatedData); }
+                    if(!freezeDate || blockEnd > freezeDate){
+                        thisBlock.resizable({
+                            grid: cellWidth, 
+                            handles: "e",
+                            stop: function () {
+                                var block = jQuery(this);
+                                var updatedData = [];
+
+                                updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, true);
+                                if (callback) { callback(updatedData); }
+                            }
+                        });
+                    }
                 }
-            });
+            }
         }
         
-        function bindBlockDrag(div, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, callback) {
-            jQuery("div.ganttview-block", div).draggable({
-                axis: "x", 
-                grid: [cellWidth, cellWidth],
-                stop: function () {
-                    var block = jQuery(this);
-                    var updatedData = [];
+        function bindBlockDrag(div, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, callback) {
+            for(var block in jQuery("div.ganttview-block", div)){
+                if(block == parseInt(block)){
+                    var thisBlock = jQuery(jQuery("div.ganttview-block", div)[block]);
+                    var blockStart = thisBlock.data("block-data").start;
 
-                    updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, false);
-                    if (callback) { callback(updatedData); }
+                    if(!freezeDate || blockStart > freezeDate){
+                        thisBlock.draggable({
+                            axis: "x", 
+                            grid: [cellWidth, cellWidth],
+                            stop: function () {
+                                var block = jQuery(this);
+                                var updatedData = [];
+
+                                updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, false);
+                                if (callback) { callback(updatedData); }
+                            }
+                        });
+                    }
                 }
-            });
+            }
         }
         
-        function updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, updateDependencies, isResize) {
+        function updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, isResize) {
             var parentChildren = block.parent().children();
             var childElementCount = parentChildren.length;
             var index;
@@ -603,9 +633,16 @@ var dayInMS = 86400000;
 
             // Set new start date
             var oldStart = block.data("block-data").start
-            var offsetChunks = getOffsetChunks(startDate, oldStart, offset, cellWidth, dateChunks);
+            var startOffsetChunks = getOffsetChunks(startDate, oldStart, offset, cellWidth, dateChunks);
 
-            var newStart = updateDate(startDate, offsetChunks, dateChunks);
+            var newStart = updateDate(startDate, startOffsetChunks, dateChunks);
+
+            //if the block is moved to be before the freezeDate, set newStart to be the freezeDate
+            if (freezeDate && !isResize && newStart < freezeDate){
+                newStart = updateDate(freezeDate, 0, dateChunks);
+
+                offset = DateUtils.timeInChunksBetween(startDate, freezeDate, dateChunks)*cellWidth;
+            }
 
             // Set new end date
             var oldEnd = block.data("block-data").end;
@@ -618,6 +655,12 @@ var dayInMS = 86400000;
 
             var newEnd = updateDate(newStart, offsetChunks, dateChunks);
 
+            //if the end date is moved prior to the freeze date, set newEnd to freezeDate
+            //NOTE: BLOCK WILL STILL DISPLAY AS BEING PRIOR TO (but endDate should be correct)
+            if (freezeDate && isResize && newEnd < freezeDate){
+                newEnd = updateDate(freezeDate, 0, dateChunks);
+            }
+
             var endChanged = newEnd.valueOf()!=oldEnd.valueOf();
 
             var newDuration = DateUtils.chunksToTime(DateUtils.timeInChunksBetween(newStart, newEnd, dateChunks), dateChunks);
@@ -629,11 +672,11 @@ var dayInMS = 86400000;
             var chunksDiff = DateUtils.timeInChunksBetween(oldEnd, newEnd, dateChunks);
             //if nextSibling
             if(updateDependencies && index < childElementCount-1 && endChanged){
-                updateFollowing(offset + width, chunksDiff, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
+                updateFollowing(offset + width, newEnd, chunksDiff, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
             }
         }
 
-        function updateFollowing(offset, offsetChunks, block, updatedData, dateChunks, cellWidth){
+        function updateFollowing(offset, prevEnd, offsetChunks, block, updatedData, dateChunks, cellWidth){
             var parentChildren = block.parent().children();
             var childElementCount = parentChildren.length;
             var index;
@@ -651,6 +694,12 @@ var dayInMS = 86400000;
             var oldStart = block.data("block-data").start
 
             var newStart = updateDate(oldStart, offsetChunks, dateChunks);
+
+            if (newStart < prevEnd){
+                newStart = updateDate(prevEnd, 0, dateChunks);
+
+                offsetChunks = DateUtils.timeInChunksBetween(oldStart, prevEnd, dateChunks);
+            }
 
             var startChanged = newStart.valueOf()!=oldStart.valueOf();
 
