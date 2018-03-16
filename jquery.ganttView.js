@@ -53,6 +53,7 @@ var dayInMS = 86400000;
             cellBuffer: 5, //number of cells to display prior to the start time
             dateChunks: 1, //default to day (how many chunks to split each day into [ie how many cells make up one day])
             freezeDate: null, //default to no freezeDate
+            displayGroupedTitles: true, //default to true
             updateDependencies: false, //default to false to maintain backwards compatibility
             cellWidth: 21,
             cellHeight: 31,
@@ -116,7 +117,7 @@ var dayInMS = 86400000;
 
         function render() {
 
-            addVtHeader(div, opts.data, opts.dateChunks, opts.cellHeight, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
+            addVtHeader(div, opts.data, opts.dateChunks, opts.cellHeight, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles, opts.displayGroupedTitles);
 
             var slideDiv = jQuery("<div>", {
                 "class": "ganttview-slide-container",
@@ -126,7 +127,7 @@ var dayInMS = 86400000;
             dates = getDates(opts.start, opts.end);
 
             addHzHeader(slideDiv, opts.start, dates, opts.dateChunks, opts.cellWidth);
-            addGrid(slideDiv, opts.data, dates, opts.dateChunks, opts.cellWidth, opts.cellHeight, opts.showWeekends, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
+            addGrid(slideDiv, opts.data, dates, opts.dateChunks, opts.freezeDate, opts.cellWidth, opts.cellHeight, opts.showWeekends, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
             addBlockContainers(slideDiv, opts.data, opts.dateChunks, opts.cellHeight, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
             addBlocks(slideDiv, opts.data, opts.dateChunks, opts.cellWidth, opts.cellHeight, opts.start, opts.groupBySeries, opts.groupById, opts.groupByIdDrawAllTitles);
             div.append(slideDiv);
@@ -158,7 +159,7 @@ var dayInMS = 86400000;
             return dates;
         }
 
-        function addVtHeader(div, data, dateChunks, cellHeight, groupBySeries, groupById, groupByIdDrawAllTitles) {
+        function addVtHeader(div, data, dateChunks, cellHeight, groupBySeries, groupById, groupByIdDrawAllTitles, displayGroupedTitles) {
             var listId = {};
             var rowIdx = 1;
             var vthHeight = 41;
@@ -191,13 +192,17 @@ var dayInMS = 86400000;
                                 "class": "ganttview-vtheader-item-name",
                                 "css": { "height": cellHeight + "px" }
                             }).append(data[i].name));
-                            var seriesDiv = jQuery("<div>", { "class": "ganttview-vtheader-series" });
-                            var serieNames = new Array();
-                            for (var j = 0; j < data[i].series.length; j++)
-                            {
-                                serieNames.push(data[i].series[j].name);
+
+                            if(displayGroupedTitles){
+                                var seriesDiv = jQuery("<div>", { "class": "ganttview-vtheader-series" });
+                                var seriesNames = new Array();
+                                for (var j = 0; j < data[i].series.length; j++)
+                                {
+                                    seriesNames.push(data[i].series[j].name);
+                                }
+                                seriesDiv.append(jQuery("<div>", { "class": "ganttview-vtheader-series-name" }).append(seriesNames.join(', ')));
                             }
-                            seriesDiv.append(jQuery("<div>", { "class": "ganttview-vtheader-series-name" }).append(serieNames.join(', ')));
+                            
                             itemDiv.append(seriesDiv);
                             headerDiv.append(itemDiv);
 
@@ -214,13 +219,15 @@ var dayInMS = 86400000;
                                 localCellHeight = cellHeight * (itemDiv.find('.ganttview-vtheader-item-name > br').length + 1);
                                 itemDiv.find('.ganttview-vtheader-item-name').append('<br />'+data[i].name).css('height', localCellHeight);
 
-                                var serieNames = new Array();
-                                for (var j = 0; j < data[i].series.length; j++)
-                                {
-                                    serieNames.push(data[i].series[j].name);
-                                }
+                                if(displayGroupedTitles){
+                                    var seriesNames = new Array();
+                                    for (var j = 0; j < data[i].series.length; j++)
+                                    {
+                                        seriesNames.push(data[i].series[j].name);
+                                    }
 
-                                itemDiv.find('.ganttview-vtheader-series-name').append('<br />'+serieNames.join(', ')).css('height', localCellHeight);
+                                    itemDiv.find('.ganttview-vtheader-series-name').append('<br />'+seriesNames.join(', ')).css('height', localCellHeight);
+                                }
                             }
                         }
                     }
@@ -231,13 +238,16 @@ var dayInMS = 86400000;
                             "class": "ganttview-vtheader-item-name",
                             "css": { "height": cellHeight + "px" }
                         }).append(data[i].name));
-                        var seriesDiv = jQuery("<div>", { "class": "ganttview-vtheader-series" });
-                        var serieNames = new Array();
-                        for (var j = 0; j < data[i].series.length; j++)
-                        {
-                            serieNames.push(data[i].series[j].name);
+
+                        if(displayGroupedTitles){
+                            var seriesDiv = jQuery("<div>", { "class": "ganttview-vtheader-series" });
+                            var seriesNames = new Array();
+                            for (var j = 0; j < data[i].series.length; j++)
+                            {
+                                seriesNames.push(data[i].series[j].name);
+                            }
+                            seriesDiv.append(jQuery("<div>", { "class": "ganttview-vtheader-series-name" }).append(seriesNames.join(', ')));
                         }
-                        seriesDiv.append(jQuery("<div>", { "class": "ganttview-vtheader-series-name" }).append(serieNames.join(', ')));
                         itemDiv.append(seriesDiv);
                         headerDiv.append(itemDiv);
                     }
@@ -249,11 +259,14 @@ var dayInMS = 86400000;
                         "class": "ganttview-vtheader-item-name",
                         "css": { "height": (data[i].series.length * cellHeight) + "px" }
                     }).append(data[i].name));
-                    var seriesDiv = jQuery("<div>", { "class": "ganttview-vtheader-series" });
-                    for (var j = 0; j < data[i].series.length; j++)
-                    {
-                        seriesDiv.append(jQuery("<div>", { "class": "ganttview-vtheader-series-name" })
-                            .append(data[i].series[j].name));
+
+                    if(displayGroupedTitles){
+                        var seriesDiv = jQuery("<div>", { "class": "ganttview-vtheader-series" });
+                        for (var j = 0; j < data[i].series.length; j++)
+                        {
+                            seriesDiv.append(jQuery("<div>", { "class": "ganttview-vtheader-series-name" })
+                                .append(data[i].series[j].name));
+                        }
                     }
                     itemDiv.append(seriesDiv);
                     headerDiv.append(itemDiv);
@@ -338,19 +351,51 @@ var dayInMS = 86400000;
             div.append(headerDiv);
         }
 
-        function addGrid(div, data, dates, dateChunks, cellWidth, cellHeight, showWeekends, groupBySeries, groupById, groupByIdDrawAllTitles) {
+        function addGrid(div, data, dates, dateChunks, freezeDate, cellWidth, cellHeight, showWeekends, groupBySeries, groupById, groupByIdDrawAllTitles) {
             var gridDiv = jQuery("<div>", { "class": "ganttview-grid" });
             var rowDiv = jQuery("<div>", { "class": "ganttview-grid-row" }).css('height', cellHeight);
 
+            let isPriorToFreeze = true, isFreezeDate = false;
+            let freezeYear = freezeDate.getFullYear();
+            let freezeMonth = freezeDate.getMonth();
+            let freezeDay = freezeDate.getDate();
+
             for (var y in dates) {
+                if(freezeDate && isPriorToFreeze && y > freezeYear){ 
+                    isPriorToFreeze = false;
+                }
+
                 for (var m in dates[y]) {
+                    if(freezeDate && isPriorToFreeze && y == freezeYear && m > freezeMonth){
+                        isPriorToFreeze = false;
+                    }
+
                     for (var d in dates[y][m]) {
-                        let isWeekendBool = showWeekends && DateUtils.isWeekend(dates[y][m][d]);
+                        let thisDay = dates[y][m][d].clone();
+                        let isWeekendBool = showWeekends && DateUtils.isWeekend(thisDay);
+
+                        if (freezeDate && isPriorToFreeze && m == freezeMonth && thisDay.getDate() == freezeDay) {
+                            isPriorToFreeze = false;
+                            isFreezeDate = true;
+                        }
                         
                         for (var dateChunk = 0; dateChunk < dateChunks; ++dateChunk){
                             var cellDiv = jQuery("<div>", { "class": "ganttview-grid-row-cell" });
                             if (isWeekendBool) { 
                                 cellDiv.addClass("ganttview-weekend"); 
+                            }
+                            if(freezeDate && isPriorToFreeze) {
+                                cellDiv.addClass("ganttview-frozen");
+                            }
+                            else if (freezeDate && isFreezeDate) {
+                                let curTime = DateUtils.chunksToTime(dateChunk, dateChunks);
+
+                                if(curTime.hrs <= freezeDate.getHours() && curTime.mins <= freezeDate.getMinutes()){                                    
+                                    cellDiv.addClass("ganttview-frozen");
+                                }
+                                else{
+                                    isFreezeDate = false;
+                                }
                             }
                             rowDiv.append(cellDiv);
                         }
