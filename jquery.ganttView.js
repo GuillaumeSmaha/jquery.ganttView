@@ -356,9 +356,11 @@ var dayInMS = 86400000;
             var rowDiv = jQuery("<div>", { "class": "ganttview-grid-row" }).css('height', cellHeight);
 
             let isPriorToFreeze = true, isFreezeDate = false;
-            let freezeYear = freezeDate.getFullYear();
-            let freezeMonth = freezeDate.getMonth();
-            let freezeDay = freezeDate.getDate();
+            if(freezeDate){
+                let freezeYear = freezeDate.getFullYear();
+                let freezeMonth = freezeDate.getMonth();
+                let freezeDay = freezeDate.getDate();
+            }
 
             for (var y in dates) {
                 if(freezeDate && isPriorToFreeze && y > freezeYear){ 
