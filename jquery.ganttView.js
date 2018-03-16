@@ -35,16 +35,16 @@ var dayInMS = 86400000;
 
     jQuery.fn.ganttView = function () {
         var args = Array.prototype.slice.call(arguments);
-        
+
         if (args.length == 1 && typeof(args[0]) == "object") {
             build.call(this, args[0]);
         }
-        
+
         if (args.length == 2 && typeof(args[0]) == "string") {
             handleMethod.call(this, args[0], args[1]);
         }
     };
-    
+
     function build(options) {
         var els = this;
         var defaults = {
@@ -68,7 +68,7 @@ var dayInMS = 86400000;
                 resizable: true
             }
         };
-        
+
         var opts = jQuery.extend(true, defaults, options);
 
         if (opts.data) {
@@ -76,7 +76,7 @@ var dayInMS = 86400000;
         } else if (opts.dataUrl) {
             jQuery.getJSON(opts.dataUrl, function (data) { opts.data = data; build(); });
         }
-        
+
         function build() {
             var minCells = Math.floor((opts.slideWidth / opts.cellWidth)  + 5);
             var startEnd = DateUtils.getBoundaryDatesFromData(opts.data, opts.dateChunks, opts.buffer, minCells);
@@ -123,7 +123,7 @@ var dayInMS = 86400000;
                 "class": "ganttview-slide-container",
                 "css": { "width": opts.slideWidth + "px" }
             });
-            
+
             dates = getDates(opts.start, opts.end);
 
             addHzHeader(slideDiv, opts.start, dates, opts.dateChunks, opts.cellWidth);
@@ -133,7 +133,7 @@ var dayInMS = 86400000;
             div.append(slideDiv);
             applyLastClass(div.parent());
         }
-        
+
         var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
         // Creates a 3 dimensional array [year][month][day] of every day 
@@ -148,8 +148,8 @@ var dayInMS = 86400000;
                 var next = last.clone().addDays(1);
                 if (!dates[next.getFullYear()]) { dates[next.getFullYear()] = []; }
 
-                if (!dates[next.getFullYear()][next.getMonth()]) { 
-                    dates[next.getFullYear()][next.getMonth()] = []; 
+                if (!dates[next.getFullYear()][next.getMonth()]) {
+                    dates[next.getFullYear()][next.getMonth()] = [];
                 }
 
                 dates[next.getFullYear()][next.getMonth()].push(next);
@@ -163,13 +163,14 @@ var dayInMS = 86400000;
             var listId = {};
             var rowIdx = 1;
             var vthHeight = 41;
-            var headerDiv = jQuery("<div>", { 
+            var headerDiv = jQuery("<div>", {
                                                 "class": "ganttview-vtheader",
-                                                "css": { "margin-top": vthHeight + "px" } });
+                                                "css": { "margin-top": vthHeight + "px" }
+                                            });
             if(dateChunks > 1){
                 var itemDiv = jQuery("<div>", { "class": "ganttview-vtheader-item" });
                 itemDiv.append(jQuery("<div>", {
-                    "css": { 
+                    "css": {
                         "height": cellHeight*2/3 + "px",
                         "float":"right",
                         "padding-right":cellHeight/4+"px",
@@ -202,7 +203,7 @@ var dayInMS = 86400000;
                                 }
                                 seriesDiv.append(jQuery("<div>", { "class": "ganttview-vtheader-series-name" }).append(seriesNames.join(', ')));
                             }
-                            
+
                             itemDiv.append(seriesDiv);
                             headerDiv.append(itemDiv);
 
@@ -293,7 +294,7 @@ var dayInMS = 86400000;
                     }).append(monthNames[mCount] + "/" + y));
 
                     m.forEach(function (d) {
-                        daysDiv.append(jQuery("<div>", { 
+                        daysDiv.append(jQuery("<div>", {
                             "class": "ganttview-hzheader-day",
                             "css": { "width": (cellWidth*dateChunks - 1) + "px" }
                         }).append(d.getDate()));
@@ -308,7 +309,7 @@ var dayInMS = 86400000;
                                 var cellTime = -1, cellText = "";
 
                                 if (dateChunk == dateChunks - 1){ rightBorder = "1px solid #9999"; }
-                                
+
                                 if(dateChunk%2 == 0){
                                     if(timeMark%100 == 0){
                                         cellTime = timeMark;
@@ -317,7 +318,7 @@ var dayInMS = 86400000;
                                         var hourDecimal = timeMark%100;
                                         var minutes = Math.round(hourDecimal*3/5);
                                         if(minutes == 60){ minutes = 100; }
-                                        cellTime = timeMark - hourDecimal + minutes; 
+                                        cellTime = timeMark - hourDecimal + minutes;
                                     }
                                 }
 
@@ -356,14 +357,15 @@ var dayInMS = 86400000;
             var rowDiv = jQuery("<div>", { "class": "ganttview-grid-row" }).css('height', cellHeight);
 
             let isPriorToFreeze = true, isFreezeDate = false;
+
             if(freezeDate){
-                let freezeYear = freezeDate.getFullYear();
-                let freezeMonth = freezeDate.getMonth();
-                let freezeDay = freezeDate.getDate();
+                var freezeYear = freezeDate.getFullYear();
+                var freezeMonth = freezeDate.getMonth();
+                var freezeDay = freezeDate.getDate();
             }
 
             for (var y in dates) {
-                if(freezeDate && isPriorToFreeze && y > freezeYear){ 
+                if(freezeDate && isPriorToFreeze && y > freezeYear){
                     isPriorToFreeze = false;
                 }
 
@@ -380,7 +382,7 @@ var dayInMS = 86400000;
                             isPriorToFreeze = false;
                             isFreezeDate = true;
                         }
-                        
+
                         for (var dateChunk = 0; dateChunk < dateChunks; ++dateChunk){
                             var cellDiv = jQuery("<div>", { "class": "ganttview-grid-row-cell" });
                             if (isWeekendBool) { 
@@ -392,7 +394,7 @@ var dayInMS = 86400000;
                             else if (freezeDate && isFreezeDate) {
                                 let curTime = DateUtils.chunksToTime(dateChunk, dateChunks);
 
-                                if(curTime.hrs <= freezeDate.getHours() && curTime.mins <= freezeDate.getMinutes()){                                    
+                                if(curTime.hrs <= freezeDate.getHours() && curTime.mins <= freezeDate.getMinutes()){
                                     cellDiv.addClass("ganttview-frozen");
                                 }
                                 else{
@@ -456,9 +458,9 @@ var dayInMS = 86400000;
             var listId = {};
             var blockOffset = 60;
             if (dateChunks <= 1) { blockOffset = 40; }
-            var blocksDiv = jQuery("<div>", { 
+            var blocksDiv = jQuery("<div>", {
                                                 "class": "ganttview-blocks",
-                                                "css": { "margin-top": blockOffset + "px" } 
+                                                "css": { "margin-top": blockOffset + "px" }
                                             });
             for (var i = 0; i < data.length; i++)
             {
@@ -469,7 +471,7 @@ var dayInMS = 86400000;
                     {
                         if(typeof listId[ id ] === 'undefined')
                         {
-                            blocksDiv.append(jQuery("<div>", { "class": "ganttview-block-container" }));                         
+                            blocksDiv.append(jQuery("<div>", { "class": "ganttview-block-container" }));
                             listId[ id ] = {index: rowIdx, cnt: 0};
                             rowIdx ++;
                         }
@@ -484,7 +486,6 @@ var dayInMS = 86400000;
                             }
                         }
                     }
-
                     else
                     {
                         blocksDiv.append(jQuery("<div>", { "class": "ganttview-block-container" }));
@@ -539,7 +540,7 @@ var dayInMS = 86400000;
             }
         }
 
-        function generateBlock(dataItem, rows, index, groupBySeries, start, dateChunks, cellWidth){ 
+        function generateBlock(dataItem, rows, index, groupBySeries, start, dateChunks, cellWidth){
             for (var j = 0; j < dataItem.series.length; j++)
             {
                 var series = dataItem.series[j];
@@ -558,10 +559,13 @@ var dayInMS = 86400000;
                       "top": 0
                     }
                 });
+
                 addBlockData(block, dataItem, series);
+
                 if (dataItem.series[j].color) {
                     block.css("background-color", dataItem.series[j].color);
                 }
+
                 block.append(jQuery("<div>", { "class": "ganttview-block-text" }).text(size/dateChunks*24));
                 jQuery(rows[index]).append(block);
 
@@ -584,7 +588,7 @@ var dayInMS = 86400000;
             jQuery("div.ganttview-hzheader-days div.ganttview-hzheader-day:last-child", div).addClass("last");
             jQuery("div.ganttview-hzheader-months div.ganttview-hzheader-month:last-child", div).addClass("last");
         }
-            
+
         return {
             render: render
         };
@@ -595,16 +599,16 @@ var dayInMS = 86400000;
         function apply() {
             jQuery("div.ganttview-slide-container", div).scrollLeft(getScrollTo(opts.buffer, opts.dateChunks, opts.chunksToStartTime, opts.cellWidth, opts.cellBuffer));
 
-            if (opts.behavior.clickable) { 
-                bindBlockClick(div, opts.behavior.onClick); 
+            if (opts.behavior.clickable) {
+                bindBlockClick(div, opts.behavior.onClick);
             }
-            
+
             if (opts.behavior.resizable) {
-                bindBlockResize(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.updateDependencies, opts.behavior.onResize); 
+                bindBlockResize(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.updateDependencies, opts.behavior.onResize);
             }
-            
+
             if (opts.behavior.draggable) {
-                bindBlockDrag(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.updateDependencies, opts.behavior.onDrag); 
+                bindBlockDrag(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.updateDependencies, opts.behavior.onDrag);
             }
         }
 
@@ -613,7 +617,7 @@ var dayInMS = 86400000;
                 if (callback) { callback(jQuery(this).data("block-data")); }
             });
         }
-        
+
         function bindBlockResize(div, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, callback) {
             for(var block in jQuery("div.ganttview-block", div)){
                 if(block == parseInt(block)){
@@ -622,7 +626,7 @@ var dayInMS = 86400000;
 
                     if(!freezeDate || blockEnd > freezeDate){
                         thisBlock.resizable({
-                            grid: cellWidth, 
+                            grid: cellWidth,
                             handles: "e",
                             stop: function () {
                                 var block = jQuery(this);
@@ -636,7 +640,7 @@ var dayInMS = 86400000;
                 }
             }
         }
-        
+
         function bindBlockDrag(div, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, callback) {
             for(var block in jQuery("div.ganttview-block", div)){
                 if(block == parseInt(block)){
@@ -645,7 +649,7 @@ var dayInMS = 86400000;
 
                     if(!freezeDate || blockStart > freezeDate){
                         thisBlock.draggable({
-                            axis: "x", 
+                            axis: "x",
                             grid: [cellWidth, cellWidth],
                             stop: function () {
                                 var block = jQuery(this);
@@ -659,7 +663,7 @@ var dayInMS = 86400000;
                 }
             }
         }
-        
+
         function updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, isResize) {
             var parentChildren = block.parent().children();
             var childElementCount = parentChildren.length;
@@ -804,7 +808,7 @@ var dayInMS = 86400000;
         }
 
         return {
-            apply: apply    
+            apply: apply
         };
     }
 
@@ -813,8 +817,8 @@ var dayInMS = 86400000;
         contains: function (arr, obj) {
             var has = false;
 
-            for (var i = 0; i < arr.length; i++) { 
-                if (arr[i] == obj) { has = true; } 
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i] == obj) { has = true; }
             }
 
             return has;
