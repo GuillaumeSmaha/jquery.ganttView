@@ -116,8 +116,12 @@ div.ganttview-grid-row-cell.ganttview-weekend {
     background-color: #fafafa;
 }
 
+div.ganttview-grid-row-cell.ganttview-weekend.ganttview-frozen {
+    background-color: #e4e4e4;
+}
+
 div.ganttview-grid-row-cell.ganttview-frozen {
-    background-color: #d1d1d1;
+    background-color: #e9e9e9;
 }
 
 /* Blocks */
