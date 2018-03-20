@@ -739,16 +739,14 @@ var dayInMS = 86400000;
                 offsetChunks = DateUtils.timeInChunksBetween(oldStart, prevEnd, dateChunks);
             }
 
-            var startChanged = newStart.valueOf()!=oldStart.valueOf();
-
             // Set new end date
             var oldEnd = block.data("block-data").end;
             var chunksFromStartToEnd = DateUtils.timeInChunksBetween(oldStart, oldEnd, dateChunks);
 
-            var newEnd = updateDate(oldEnd, chunksFromStartToEnd, dateChunks);
+            var newEnd = updateDate(oldEnd, offsetChunks, dateChunks);
 
 
-            var newText = parseInt(chunksFromStartToEnd/dateChunks)+1;
+            var newText = DateUtils.chunksToTime(chunksFromStartToEnd, dateChunks);
             var pixelOffset = parseFloat(block.css("margin-left")) + (offsetChunks*cellWidth);
 
             updateBlockDataAndCss(block, newStart, newEnd, newText, pixelOffset);
