@@ -723,24 +723,11 @@ var dayInMS = 86400000;
             var chunksDiff = DateUtils.timeInChunksBetween(oldEnd, newEnd, dateChunks);
             //if nextSibling
             if(updateDependencies && index < childElementCount-1 && endChanged){
-                updateFollowing(offset + width, newEnd, chunksDiff, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
+                updateFollowing(offset + width, newEnd, index+1, childElementCount, parentChildren, chunksDiff, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
             }
         }
 
-        function updateFollowing(offset, prevEnd, offsetChunks, block, updatedData, dateChunks, cellWidth){
-            var parentChildren = block.parent().children();
-            var childElementCount = parentChildren.length;
-            var index;
-
-            let i=0;
-
-            while (!index && i<childElementCount){
-                if(parentChildren[i] == block[0]){
-                    index = i;
-                }
-                ++i;
-            }
-
+        function updateFollowing(offset, prevEnd, index, childElementCount, parentChildren, offsetChunks, block, updatedData, dateChunks, cellWidth){
             // Set new start date
             var oldStart = block.data("block-data").start
 
@@ -771,7 +758,7 @@ var dayInMS = 86400000;
 
             //if nextSibling
             if(index < childElementCount-1 && endChanged){
-                updateFollowing(pixelOffset + chunksFromStartToEnd*cellWidth, offsetChunks, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
+                updateFollowing(pixelOffset + chunksFromStartToEnd*cellWidth, newEnd, index+1, childElementCount, parentChildren, offsetChunks, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
             }
         }
 
