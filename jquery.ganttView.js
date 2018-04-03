@@ -12,6 +12,9 @@ data: object
 buffer: number
 cellBuffer: number
 dateChunks: number
+freezeDate: datetime
+displayGroupedTitles: boolean
+reorder: boolean
 updateDependencies: boolean
 cellWidth: number
 cellHeight: number
@@ -54,7 +57,9 @@ var dayInMS = 86400000;
             dateChunks: 1, //default to day (how many chunks to split each day into [ie how many cells make up one day])
             freezeDate: null, //default to no freezeDate
             displayGroupedTitles: true, //default to true
+            reorder: true, //default to false to maintain backwards compatibility (allow blocks to be reordered)
             updateDependencies: false, //default to false to maintain backwards compatibility
+            doNotDisplayTagged: [], //default to display all
             cellWidth: 21,
             cellHeight: 31,
             slideWidth: 400,
@@ -70,6 +75,20 @@ var dayInMS = 86400000;
         };
 
         var opts = jQuery.extend(true, defaults, options);
+
+        if (opts.doNotDisplayTagged.length > 0){
+            tagsRemoved = [];
+
+            for(var j=0; j< opts.doNotDisplayTagged.length; ++j){
+                for(var i=0; i<opts.data[0].series.length; ++i){
+                    if(!opts.data[0].series[i][opts.doNotDisplayTagged[j]]){
+                        tagsRemoved.push(opts.data[0].series[i]);
+                    }
+                }
+            }
+
+            opts.data[0].series = tagsRemoved;
+        }
 
         if (opts.data) {
             build();
@@ -604,11 +623,11 @@ var dayInMS = 86400000;
             }
 
             if (opts.behavior.resizable) {
-                bindBlockResize(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.updateDependencies, opts.behavior.onResize);
+                bindBlockResize(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.reorder, opts.updateDependencies, opts.behavior.onResize);
             }
 
             if (opts.behavior.draggable) {
-                bindBlockDrag(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.updateDependencies, opts.behavior.onDrag);
+                bindBlockDrag(div, opts.dateChunks, opts.cellBuffer, opts.cellWidth, opts.start, opts.freezeDate, opts.reorder, opts.updateDependencies, opts.behavior.onDrag);
             }
         }
 
@@ -618,13 +637,13 @@ var dayInMS = 86400000;
             });
         }
 
-        function bindBlockResize(div, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, callback) {
+        function bindBlockResize(div, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, reorder, updateDependencies, callback) {
             for(var block in jQuery("div.ganttview-block", div)){
                 if(block == parseInt(block)){
                     var thisBlock = jQuery(jQuery("div.ganttview-block", div)[block]);
                     var blockEnd = thisBlock.data("block-data").end;
 
-                    if(!freezeDate || blockEnd > freezeDate){
+                    if((!freezeDate || blockEnd > freezeDate)) {
                         thisBlock.resizable({
                             grid: cellWidth,
                             handles: "e",
@@ -632,7 +651,7 @@ var dayInMS = 86400000;
                                 var block = jQuery(this);
                                 var updatedData = [];
 
-                                updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, true);
+                                updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, reorder, updateDependencies, true);
                                 if (callback) { callback(updatedData); }
                             }
                         });
@@ -641,13 +660,13 @@ var dayInMS = 86400000;
             }
         }
 
-        function bindBlockDrag(div, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, callback) {
+        function bindBlockDrag(div, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, reorder, updateDependencies, callback) {
             for(var block in jQuery("div.ganttview-block", div)){
                 if(block == parseInt(block)){
                     var thisBlock = jQuery(jQuery("div.ganttview-block", div)[block]);
                     var blockStart = thisBlock.data("block-data").start;
 
-                    if(!freezeDate || blockStart > freezeDate){
+                    if((!freezeDate || blockStart > freezeDate)){
                         thisBlock.draggable({
                             axis: "x",
                             grid: [cellWidth, cellWidth],
@@ -655,7 +674,7 @@ var dayInMS = 86400000;
                                 var block = jQuery(this);
                                 var updatedData = [];
 
-                                updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, false);
+                                updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, reorder, updateDependencies, false);
                                 if (callback) { callback(updatedData); }
                             }
                         });
@@ -664,7 +683,7 @@ var dayInMS = 86400000;
             }
         }
 
-        function updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, updateDependencies, isResize) {
+        function updateDataAndPosition(div, block, updatedData, dateChunks, cellBuffer, cellWidth, startDate, freezeDate, reorder, updateDependencies, isResize) {
             var parentChildren = block.parent().children();
             var childElementCount = parentChildren.length;
             var index;
@@ -682,14 +701,22 @@ var dayInMS = 86400000;
                 ++i;
             }
 
+            var prevEnd = jQuery(parentChildren[index-1]).data("block-data").end;
+
             // Set new start date
             var oldStart = block.data("block-data").start
             var startOffsetChunks = getOffsetChunks(startDate, oldStart, offset, cellWidth, dateChunks);
 
             var newStart = updateDate(startDate, startOffsetChunks, dateChunks);
 
+            if (!reorder && !isResize && newStart < prevEnd) {
+                newStart = updateDate(prevEnd, 0, dateChunks);
+
+                offset = DateUtils.timeInChunksBetween(startDate, prevEnd, dateChunks)*cellWidth;
+            }
+
             //if the block is moved to be before the freezeDate, set newStart to be the freezeDate
-            if (freezeDate && !isResize && newStart < freezeDate){
+            if (freezeDate && !isResize && newStart < freezeDate) {
                 newStart = updateDate(freezeDate, 0, dateChunks);
 
                 offset = DateUtils.timeInChunksBetween(startDate, freezeDate, dateChunks)*cellWidth;
@@ -723,11 +750,11 @@ var dayInMS = 86400000;
             var chunksDiff = DateUtils.timeInChunksBetween(oldEnd, newEnd, dateChunks);
             //if nextSibling
             if(updateDependencies && index < childElementCount-1 && endChanged){
-                updateFollowing(offset + width, newEnd, index+1, childElementCount, parentChildren, chunksDiff, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
+                updateFollowing(newEnd, index+1, childElementCount, parentChildren, chunksDiff, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
             }
         }
 
-        function updateFollowing(offset, prevEnd, index, childElementCount, parentChildren, offsetChunks, block, updatedData, dateChunks, cellWidth){
+        function updateFollowing(prevEnd, index, childElementCount, parentChildren, offsetChunks, block, updatedData, dateChunks, cellWidth){
             // Set new start date
             var oldStart = block.data("block-data").start
 
@@ -756,7 +783,7 @@ var dayInMS = 86400000;
 
             //if nextSibling
             if(index < childElementCount-1 && endChanged){
-                updateFollowing(pixelOffset + chunksFromStartToEnd*cellWidth, newEnd, index+1, childElementCount, parentChildren, offsetChunks, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
+                updateFollowing(newEnd, index+1, childElementCount, parentChildren, offsetChunks, jQuery(parentChildren[index+1]), updatedData, dateChunks, cellWidth);
             }
         }
 
