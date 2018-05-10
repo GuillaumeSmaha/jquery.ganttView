@@ -24,6 +24,57 @@ Documentation
 -------------
 Forthcoming...
 
+    *showWeekends; default to true
+      * boolean value to determine 
+    * data
+      * the data object; no default
+    * buffer; default to 1 day buffer
+      * number of days to add to the grid pre/post start/end
+    * cellBuffer; default to 5 cells
+      * number of cells to display prior to the start time
+    * dateChunks; default to 1 for backwards compatibility
+      * how many chunks to split each day into [ie how many cells make up one day]
+        * 1 = daily, 24 = hourly, 1440 = by minutes but can be any number
+    * freezeDate; default to null
+      * date before which to allow no edits 
+        * NOTE: A TASK CAN STILL BE RESIZED SUCH THAT IT'S END APPEARS TO BE BEHIND THE FREEZEDATE; HOWEVER, THE SAVED END DATE IS CORRECT
+    * displayGroupedTitles; default to true to maintain backwards compatibility
+      * boolean value to determine whether to list all block titles
+    * reorder; defaults to true to maintain backwards compatibility
+      * boolean value setting whether or not tasks can be reordered
+    * displayHoursOnBlock; defaults to true to maintain backwards compatibility
+      * boolean value setting whether or not the duration in hours should be displayed on the block
+    * updateDependencies; default to false to maintain backwards compatibility
+      * boolean value to determine whether to update all of the following items in a series when the preceding one's end date is changed
+    * doNotDisplayTagged; default to [] to maintain backwards compatibility
+      * array of strings to ignore from data
+    * cellWidth; default to 21
+      * width of each cell on the grid
+    * cellHeight; default to 31
+      * height of each cell on the grid
+    *slideWidth; default to 400
+      * width of the displayed portion of the grid
+    * groupBySeries; default to false
+      * boolean value to determine whether to list all tasks under the same series on the same row
+    * groupById; default to false
+      * boolean value to determine whether to list all tasks with the same id on the same row
+    * groupByIdDrawAllTitles; default to false
+      * boolean value to determine whether to draw all titles if grouped by id (?)
+    * vHeaderWidth; default to 100
+      * width of the section to the right of the grid
+    * behavior
+      * clickable; default to true
+        * boolean value to determine whether the tasks can be clicked
+      * draggable; default to true
+        * boolean value to determine whether the tasks can be dragged to new locations
+      * resizable; default to true
+        * boolean value to determine whether tasks can be resized
+      * onClick
+        * function that is run whenever a task is clicked
+      * onDrag
+        * function that is run whenever a task is dragged
+      * onResize
+        * function that is run whenever a task is resized
 
 Contribution Guidelines
 ------------
